@@ -852,7 +852,8 @@ def _known_provider_base_urls() -> dict[str, str]:
     known service (e.g. `https://api.deepseek.com`) points to the correct provider.
     """
     responses, chat = _openai_compatible_provider_names()
-    mapping: dict[str, str] = {}
+    # Moonshot's default URL now depends on constructor state.
+    mapping: dict[str, str] = {"api.moonshot.ai": "moonshotai"}
     # Sorted so that, if two providers normalize alike, the first wins.
     for name in sorted(responses | chat):
         provider_class = _try_infer_provider_class(name)
@@ -866,7 +867,8 @@ def _known_provider_base_urls() -> dict[str, str]:
             )
             continue
         normalized = _normalize_base_url(base_url)
-        if normalized:
+        # A shared OpenAI endpoint does not identify an authentication provider.
+        if normalized and normalized != "api.openai.com":
             mapping.setdefault(normalized, name)
     return mapping
 
