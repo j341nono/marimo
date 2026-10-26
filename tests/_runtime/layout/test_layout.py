@@ -33,6 +33,45 @@ def test_save_layout_config(temp_dir: str):
     assert saved_data == {"type": "grid", "data": {"cols": 2}}
 
 
+@pytest.mark.parametrize(
+    ("app_name", "expected"),
+    [
+        ("demo.py.py", "layouts/demo.py.grid.json"),
+        ("demo.pyramid.py", "layouts/demo.pyramid.grid.json"),
+        ("demo.pyramid", "layouts/demo.pyramid.grid.json"),
+        ("demo.md", "layouts/demo.md.grid.json"),
+    ],
+)
+def test_save_layout_preserves_filename(
+    tmp_path: Path, app_name: str, expected: str
+) -> None:
+    config = LayoutConfig(type="grid", data={"cols": 2})
+
+    filepath = save_layout_config(tmp_path, app_name, config)
+
+    assert filepath == expected
+    assert read_layout_config(tmp_path, filepath) == config
+
+
+def test_save_layout_does_not_overwrite_another_notebook(
+    tmp_path: Path,
+) -> None:
+    first_config = LayoutConfig(type="grid", data={"cols": 2})
+    second_config = LayoutConfig(type="grid", data={"cols": 5})
+
+    first_path = save_layout_config(tmp_path, "demo.py.py", first_config)
+    second_path = save_layout_config(tmp_path, "demo.py", second_config)
+
+    assert (first_path, second_path) == (
+        "layouts/demo.py.grid.json",
+        "layouts/demo.grid.json",
+    )
+    assert (
+        read_layout_config(tmp_path, first_path),
+        read_layout_config(tmp_path, second_path),
+    ) == (first_config, second_config)
+
+
 def test_read_layout_config(temp_dir: str):
     # Create a test layout file
     config = LayoutConfig(type="grid", data={"cols": 2})
