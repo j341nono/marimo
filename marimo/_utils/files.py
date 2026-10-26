@@ -4,6 +4,7 @@ from __future__ import annotations
 import fnmatch
 import os
 import re
+from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -55,6 +56,30 @@ def _get_root(pattern: str) -> str:
     return root
 
 
+def _matches_file_pattern(path: Path, pattern: str) -> bool:
+    path_parts = path.parts
+    pattern_parts = Path(pattern).parts
+
+    @cache
+    def match(path_index: int, pattern_index: int) -> bool:
+        if pattern_index == len(pattern_parts):
+            return path_index == len(path_parts)
+        if pattern_parts[pattern_index] == "**":
+            return match(path_index, pattern_index + 1) or (
+                path_index < len(path_parts)
+                and match(path_index + 1, pattern_index)
+            )
+        return (
+            path_index < len(path_parts)
+            and fnmatch.fnmatch(
+                path_parts[path_index], pattern_parts[pattern_index]
+            )
+            and match(path_index + 1, pattern_index + 1)
+        )
+
+    return match(0, 0)
+
+
 def expand_file_patterns(file_patterns: tuple[str, ...]) -> list[Path]:
     """Expand file patterns to actual file paths.
 
@@ -82,7 +107,7 @@ def expand_file_patterns(file_patterns: tuple[str, ...]) -> list[Path]:
                     matched_files = [
                         path
                         for path in all_files
-                        if fnmatch.fnmatch(str(path), pattern)
+                        if _matches_file_pattern(path, pattern)
                     ]
                     files_to_check.extend(matched_files)
             else:
@@ -127,7 +152,7 @@ async def async_expand_file_patterns(
                 if await async_path.isdir(root):
                     async for file_path in async_get_files(root):
                         if (
-                            fnmatch.fnmatch(str(file_path), pattern)
+                            _matches_file_pattern(file_path, pattern)
                             and file_path not in seen
                         ):
                             seen.add(file_path)

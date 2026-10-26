@@ -4,6 +4,8 @@
 import asyncio
 from pathlib import Path
 
+import pytest
+
 from marimo._lint import FileStatus, Linter, run_check
 from marimo._lint.diagnostic import Diagnostic, Severity
 
@@ -83,6 +85,30 @@ def __():
         # File has no cell boundaries — treated as unrecognisable/empty
         assert result.files[0].failed is False
         assert result.files[0].skipped is True
+
+    @pytest.mark.parametrize(
+        ("pattern", "expected"),
+        [
+            ("*.py", ["top.py"]),
+            ("**/*.py", ["sub/nested.py", "top.py"]),
+        ],
+    )
+    def test_run_check_glob_respects_directory_depth(
+        self, tmp_path: Path, pattern: str, expected: list[str]
+    ) -> None:
+        (tmp_path / "sub").mkdir()
+        for name in ["top.py", "sub/nested.py"]:
+            (tmp_path / name).write_text("# empty notebook")
+
+        result = run_check((str(tmp_path / pattern),))
+
+        assert (
+            sorted(
+                Path(file.file).relative_to(tmp_path).as_posix()
+                for file in result.files
+            )
+            == expected
+        )
 
     def test_run_check_with_glob_patterns(self, tmpdir):
         """Test run_check with glob patterns."""
